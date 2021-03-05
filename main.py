@@ -13,37 +13,42 @@ import pandas as pd
 import datetime
 import time
 
+import operator
 import requests
 
-ticker = "MSFT"
 
 #GET /markets/{market_name}/candles?resolution={resolution}&limit={limit}&start_time={start_time}&end_time={end_time}
 
-ts = int(time.time() * 1000)
-
-_market1Name = 'BTC-PERP'
-_market2Name = 'ETH-PERP'
-
-_resolution = '300'
-_limit = '500'
-_start_time = ''
-_end_time = ''
+def getCandles(df: pd.DataFrame, _marketName: str, _resolution = '300', _limit = '500'):
+    r1 = requests.get(ENDPOINT + '/markets/{market_name}/candles?resolution={resolution}&limit={limit}'.format(market_name = _marketName, resolution=_resolution, limit=_limit))
+    df1 = pd.DataFrame(r1.json()['result'])
+    
+    df[_marketName] = df1['close'];
+    
+    print('loading data from {name}'.format(name = _marketName))
+    print(df)
+    
 
 ENDPOINT = 'https://ftx.com/api'
 
-r1 = requests.get(ENDPOINT + '/markets/{market_name}/candles?resolution={resolution}&limit={limit}'.format(market_name = _market1Name, resolution=_resolution, limit=_limit))
-r2 = requests.get(ENDPOINT + '/markets/{market_name}/candles?resolution={resolution}&limit={limit}'.format(market_name = _market2Name, resolution=_resolution, limit=_limit))
+#Get the markets from the API
+markets = requests.get(ENDPOINT + "/markets");
 
-#print(r1.json()['result'])
+#parse the json results
+result = markets.json()['result']
 
-df1 = pd.DataFrame(r1.json()['result'])
-df2 = pd.DataFrame(r2.json()['result'])
+#create a list of all the names of futures markets
+watchlist = list(map(operator.itemgetter('name'), filter(lambda d: d['type'] == 'future', result)))
 
-#print(df2)
+#filter for perpetuals
+watchlist = list(filter(lambda d: d.find('PERP') > 0, watchlist))
 
-s1 = df1['close']
-s2 = df2['close']
+#print(list(filter(lambda d: d.find('PERP'), watchlist)))
 
-print("The correlation between BTC-ETH is {corr}".format(corr = s1.corr(s2)))
+df = pd.DataFrame()
 
-#print(df1.corr())
+#populate dataframe with marketcloses from markets
+for ticker in watchlist:
+    getCandles(df, ticker)
+
+print(df.corr())
